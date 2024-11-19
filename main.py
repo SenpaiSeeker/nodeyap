@@ -1,4 +1,5 @@
 import asyncio
+import requests
 import cloudscraper
 import time
 from loguru import logger
@@ -86,6 +87,33 @@ def load_proxies(proxy_file):
         logger.error(f"Failed to load proxies: {e}")
         raise SystemExit("Exiting due to failure in loading proxies")
 
+
+def fetch_and_save_proxies(proxy_file):
+    """Fetches proxies from the API and saves them to 'proxies.txt'."""
+    api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
+    
+    try:
+        # Fetch proxies from the API
+        response = requests.get(api_url, stream=True)
+
+        # Check if the response is successful
+        if response.status_code == 200:
+            proxies = response.text.strip().splitlines()
+
+            # Save proxies 
+            if proxies:
+                with open(proxy_file, 'w') as f:
+                    f.writelines([proxy + '\n' for proxy in proxies])
+                logger.info(f"Fetched and saved {len(proxies)} proxies to {proxy_file}.")
+            else:
+                logger.error("No proxies found from the API.")
+        else:
+            logger.warning(f"Failed to fetch proxies. Status code: {response.status_code}")
+
+    except Exception as e:
+        logger.error(f"Error fetching proxies: {e}")
+
+
 # Fungsi utama
 async def render_profile_info(proxy):
     """Mengambil informasi profil dan memulai ping."""
@@ -139,6 +167,7 @@ async def ping(proxy):
 
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
+    fetch_and_save_proxies('proxies.txt')
     proxies = load_proxies('proxies.txt')
     active_proxies = [proxy for proxy in proxies]
 
