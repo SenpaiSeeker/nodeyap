@@ -159,7 +159,7 @@ async def main():
 
         for task in done:
             failed_proxy = tasks[task]
-            if task.result() == failed_proxy:
+            if task.result() != failed_proxy:
                 logger.info(f"Proxy {failed_proxy} failed. Removing from active proxies.")
                 active_proxies.remove(failed_proxy)
 
