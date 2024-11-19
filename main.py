@@ -5,7 +5,6 @@ import uuid
 from loguru import logger
 
 # Konstanta
-PING_INTERVAL = 1  # Interval ping dalam detik
 RETRY_LIMIT = 3  # Batas retry jika proxy gagal
 
 DOMAIN_API = {
@@ -119,7 +118,6 @@ async def start_ping(proxy):
     try:
         while True:
             await ping(proxy)
-            await asyncio.sleep(PING_INTERVAL)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
@@ -150,7 +148,7 @@ async def ping(proxy):
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     proxies = load_proxies('proxies.txt')
-    active_proxies = [proxy for proxy in proxies[:999]]
+    active_proxies = [proxy for proxy in proxies]
 
     while True:
         tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
