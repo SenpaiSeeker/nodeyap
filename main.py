@@ -1,8 +1,8 @@
 import asyncio
-import requests
-import cloudscraper
+import aiohttp
 import time
 from loguru import logger
+from cloudscraper import create_scraper
 
 # URL API dan Konstanta
 DOMAIN_API = {
@@ -34,40 +34,41 @@ def load_token():
         logger.error(f"Failed to load token: {e}")
         raise SystemExit("Exiting due to failure in loading token")
 
-def valid_resp(resp):
+async def valid_resp(response):
     """Memvalidasi respons API."""
-    if not resp or "code" not in resp or resp["code"] < 0:
-        raise ValueError("Invalid response")
-    return resp
-
-# Inisialisasi token dan scraper
-token_info = load_token()
-scraper = cloudscraper.create_scraper(
-    browser={
-        'browser': 'chrome',
-        'platform': 'windows',
-        'desktop': True
-    }
-)
-
-# Fungsi API
-def call_api(url, data, proxy):
-    """Melakukan panggilan API."""
-    headers = {
-        "Authorization": f"Bearer {token_info}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json",
-    }
-
     try:
-        response = scraper.post(url, json=data, headers=headers, proxies={"http": proxy, "https": proxy})
-        response.raise_for_status()
+        resp_json = await response.json()
+        if not resp_json or "code" not in resp_json or resp_json["code"] < 0:
+            raise ValueError("Invalid response")
+        return resp_json
     except Exception as e:
-        logger.error(f"Error during API call to {url}: {e}")
-        raise ValueError(f"Failed API call to {url}")
+        logger.error(f"Failed to parse or validate response: {e}")
+        raise ValueError("Invalid API Response")
 
-    return valid_resp(response.json())
+async def fetch_proxies(api_url):
+    """Mengambil daftar proxy dari API."""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api_url) as response:
+                if response.status == 200:
+                    proxies = (await response.text()).strip().splitlines()
+                    logger.info(f"Fetched {len(proxies)} proxies from API.")
+                    return proxies
+                else:
+                    logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
+                    return []
+    except Exception as e:
+        logger.error(f"Error fetching proxies: {e}")
+        return []
+
+def save_proxies(proxy_file, proxies):
+    """Menyimpan proxy ke file."""
+    try:
+        with open(proxy_file, 'w') as file:
+            file.writelines([proxy + '\n' for proxy in proxies])
+        logger.info(f"Saved {len(proxies)} proxies to {proxy_file}.")
+    except Exception as e:
+        logger.error(f"Error saving proxies: {e}")
 
 def load_proxies(proxy_file):
     """Memuat daftar proxies dari file."""
@@ -80,57 +81,55 @@ def load_proxies(proxy_file):
         logger.error(f"Failed to load proxies: {e}")
         raise SystemExit("Exiting due to failure in loading proxies")
 
-def fetch_and_save_proxies(proxy_file):
-    """Mengambil proxy dari API dan menyimpannya ke file."""
-    api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
-    
+async def call_api(url, data, proxy, token_info):
+    """Melakukan panggilan API menggunakan aiohttp."""
+    headers = {
+        "Authorization": f"Bearer {token_info}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+    }
+
     try:
-        response = requests.get(api_url, stream=True)
-
-        if response.status_code == 200:
-            proxies = response.text.strip().splitlines()
-
-            if proxies:
-                with open(proxy_file, 'w') as file:
-                    file.writelines([proxy + '\n' for proxy in proxies])
-                logger.info(f"Fetched and saved {len(proxies)} proxies to {proxy_file}.")
-            else:
-                logger.warning("No proxies found from the API.")
-        else:
-            logger.warning(f"Failed to fetch proxies. Status code: {response.status_code}")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url, json=data, headers=headers, proxy=proxy
+            ) as response:
+                response.raise_for_status()
+                return await valid_resp(response)
     except Exception as e:
-        logger.error(f"Error fetching proxies: {e}")
+        logger.error(f"Error during API call to {url}: {e}")
+        raise ValueError(f"Failed API call to {url}")
 
-# Fungsi utama
-async def render_profile_info(proxy):
+async def render_profile_info(proxy, token_info):
     """Mengambil informasi profil dan memulai ping."""
     global account_info
     try:
         logger.info(f"Initializing session for proxy: {proxy}")
-        response = call_api(DOMAIN_API["SESSION"], {}, proxy)
-        valid_resp(response)
+        response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
         account_info = response["data"]
 
         if account_info.get("uid"):
             logger.info(f"Session established for proxy: {proxy}. Starting ping.")
-            await start_ping(proxy)
+            await start_ping(proxy, token_info)
         else:
             logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
         return proxy  # Mengembalikan proxy yang gagal
 
-async def start_ping(proxy):
+async def start_ping(proxy, token_info):
     """Memulai proses ping berkala."""
     try:
         while True:
-            await ping(proxy)
+            await ping(proxy, token_info)
+            await asyncio.sleep(1)  # Tambahkan delay untuk mencegah spam
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
 
-async def ping(proxy):
+async def ping(proxy, token_info):
     """Mengirim ping ke URL tertentu."""
     for url in DOMAIN_API["PING"]:
         try:
@@ -139,7 +138,7 @@ async def ping(proxy):
                 "browser_id": browser_id,
                 "timestamp": int(time.time())
             }
-            response = call_api(url, data, proxy)
+            response = await call_api(url, data, proxy, token_info)
             if response["code"] == 0:
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
         except Exception as e:
@@ -149,14 +148,16 @@ async def ping(proxy):
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     proxy_file = 'proxies.txt'
+    token_info = load_token()
+    proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
 
     while True:
-        fetch_and_save_proxies(proxy_file)
+        proxies = await fetch_proxies(proxy_api_url)
+        save_proxies(proxy_file, proxies)
         active_proxies = load_proxies(proxy_file)
 
-        taks = [asyncio.create_task(render_profile_info(proxy)) for proxy in active_proxies]
-        await asyncio.gather(*taks)
-
+        tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
