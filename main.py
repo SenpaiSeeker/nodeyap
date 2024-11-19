@@ -1,7 +1,6 @@
 import asyncio
 import cloudscraper
 import time
-import uuid
 from loguru import logger
 
 DOMAIN_API = {
@@ -39,10 +38,6 @@ def load_token():
     except Exception as e:
         logger.error(f"Failed to load token: {e}")
         raise SystemExit("Exiting due to failure in loading token")
-
-def uuidv4():
-    """Menghasilkan UUID v4."""
-    return str(uuid.uuid4())
 
 def valid_resp(resp):
     """Memvalidasi respons API."""
