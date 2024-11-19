@@ -75,7 +75,7 @@ def call_api(url, data, proxy):
     }
 
     try:
-        response = scraper.post(url, json=data, headers=headers, proxies={"http": proxy, "https": proxy}, timeout=10)
+        response = scraper.post(url, json=data, headers=headers, proxies={"http": proxy, "https": proxy})
         response.raise_for_status()
     except Exception as e:
         logger.error(f"Error during API call to {url}: {e}")
