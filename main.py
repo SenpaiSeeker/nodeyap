@@ -13,14 +13,7 @@ DOMAIN_API = {
     ]
 }
 
-CONNECTION_STATES = {
-    "CONNECTED": 1,
-    "DISCONNECTED": 2,
-    "NONE_CONNECTION": 3
-}
-
 # Variabel global
-status_connect = CONNECTION_STATES["NONE_CONNECTION"]
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -139,7 +132,6 @@ async def start_ping(proxy):
 
 async def ping(proxy):
     """Mengirim ping ke URL tertentu."""
-    global status_connect
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -150,12 +142,9 @@ async def ping(proxy):
             response = call_api(url, data, proxy)
             if response["code"] == 0:
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
-                status_connect = CONNECTION_STATES["CONNECTED"]
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
-
     logger.warning(f"All ping attempts failed for proxy {proxy}.")
-    status_connect = CONNECTION_STATES["DISCONNECTED"]
 
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
