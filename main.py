@@ -150,7 +150,7 @@ async def ping(proxy):
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     proxies = load_proxies('proxies.txt')
-    active_proxies = [proxy for proxy in proxies]
+    active_proxies = [proxy for proxy in proxies[:999]]
 
     while True:
         tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
