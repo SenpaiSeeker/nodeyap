@@ -172,18 +172,9 @@ async def main():
             await asyncio.sleep(10)
             continue
 
-        tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
+        for proxy in active_proxies:
+            await render_profile_info(proxy) 
 
-        done, pending = await asyncio.wait(tasks.keys())
-
-        for task in done:
-            failed_proxy = tasks[task]
-            if task.result() == failed_proxy:
-                logger.info(f"Proxy {failed_proxy} failed. Removing from active proxies.")
-                active_proxies.remove(failed_proxy)
-
-        for task in pending:
-            task.cancel()
 
 if __name__ == '__main__':
     try:
