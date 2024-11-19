@@ -154,13 +154,8 @@ async def main():
         fetch_and_save_proxies(proxy_file)
         active_proxies = load_proxies(proxy_file)
 
-        if not active_proxies:
-            logger.warning("No active proxies available. Retrying in 10 seconds.")
-            await asyncio.sleep(10)
-            continue
-
-        for proxy in active_proxies:
-            await render_profile_info(proxy) 
+        taks = [asyncio.create_task(render_profile_info(proxy)) for proxy in active_proxies]
+        await asyncio.gather(*taks)
 
 
 if __name__ == '__main__':
