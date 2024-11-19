@@ -151,7 +151,6 @@ async def ping(proxy):
             if response["code"] == 0:
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
                 status_connect = CONNECTION_STATES["CONNECTED"]
-                return
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
 
