@@ -65,10 +65,10 @@ scraper = cloudscraper.create_scraper(
 )
 
 # Fungsi API
-def call_api(url, data, proxy, token=None):
+def call_api(url, data, proxy):
     """Melakukan panggilan API."""
     headers = {
-        "Authorization": f"Bearer {token or token_info}",
+        "Authorization": f"Bearer {token_info}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
