@@ -231,7 +231,7 @@ async def main():
                 new_task = asyncio.create_task(render_profile_info(new_proxy))
                 tasks[new_task] = new_proxy
 
-        await asyncio.sleep(3)
+        #await asyncio.sleep(3)
 
 if __name__ == '__main__':
     try:
