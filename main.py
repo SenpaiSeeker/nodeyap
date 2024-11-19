@@ -201,12 +201,11 @@ def remove_proxy_from_list(proxy):
     pass
 
 async def main():
-    with open('Proxy.txt', 'r') as f:
-        all_proxies = f.read().splitlines()
-    active_proxies = [proxy for proxy in all_proxies[:MAX_CONNECTIONS] if is_valid_proxy(proxy)]
-    tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
-
     while True:
+        with open('proxies.txt', 'r') as f:
+            all_proxies = f.read().splitlines()
+        active_proxies = [proxy for proxy in all_proxies[:MAX_CONNECTIONS] if is_valid_proxy(proxy)]
+        tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
         done, pending = await asyncio.wait(tasks.keys(), return_when=asyncio.FIRST_COMPLETED)
         
         for task in done:
