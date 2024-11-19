@@ -174,7 +174,7 @@ async def main():
 
         tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
 
-        done, pending = await asyncio.wait(tasks.keys(), return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(tasks.keys())
 
         for task in done:
             failed_proxy = tasks[task]
