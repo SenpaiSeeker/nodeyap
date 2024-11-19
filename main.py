@@ -4,9 +4,6 @@ import time
 import uuid
 from loguru import logger
 
-# Konstanta
-RETRY_LIMIT = 3  # Batas retry jika proxy gagal
-
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
     "PING": [
