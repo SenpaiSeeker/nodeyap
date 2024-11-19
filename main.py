@@ -6,8 +6,8 @@ from loguru import logger
 
 # Konstanta
 PING_INTERVAL = 30  # Interval ping dalam detik
-RETRIES = 60  # Jumlah percobaan ulang
 MAX_CONNECTIONS = 15  # Maksimal koneksi simultan
+RETRY_LIMIT = 3  # Batas retry jika proxy gagal
 
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
@@ -65,16 +65,14 @@ scraper = cloudscraper.create_scraper(
     }
 )
 
+# Fungsi API
 def call_api(url, data, proxy, token=None):
     """Melakukan panggilan API."""
     headers = {
         "Authorization": f"Bearer {token or token_info}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://app.nodepay.ai/",
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
-        "Origin": "https://app.nodepay.ai"
     }
 
     try:
@@ -90,37 +88,39 @@ def load_proxies(proxy_file):
     """Memuat daftar proxies dari file."""
     try:
         with open(proxy_file, 'r') as file:
-            return [line.strip() for line in file if line.strip()]
+            proxies = file.read().splitlines()
+            valid_proxies = [proxy for proxy in proxies if proxy]  # Hanya memuat proxy yang valid
+            logger.info(f"Loaded {len(valid_proxies)} proxies.")
+            return valid_proxies
     except Exception as e:
         logger.error(f"Failed to load proxies: {e}")
         raise SystemExit("Exiting due to failure in loading proxies")
-
-def is_valid_proxy(proxy):
-    """Memvalidasi proxy."""
-    return proxy.startswith("http://") or proxy.startswith("https://")
 
 # Fungsi utama
 async def render_profile_info(proxy):
     """Mengambil informasi profil dan memulai ping."""
     global account_info
     try:
+        logger.info(f"Initializing session for proxy: {proxy}")
         response = call_api(DOMAIN_API["SESSION"], {}, proxy)
         valid_resp(response)
         account_info = response["data"]
+
         if account_info.get("uid"):
-            logger.info(f"Successfully authenticated with proxy: {proxy}")
+            logger.info(f"Session established for proxy: {proxy}. Starting ping.")
             await start_ping(proxy)
         else:
-            logger.warning(f"Authentication failed with proxy: {proxy}")
+            logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
+        return proxy  # Mengembalikan proxy yang gagal
 
 async def start_ping(proxy):
     """Memulai proses ping berkala."""
     try:
         while True:
             await ping(proxy)
-            await asyncio.sleep(PING_INTERVAL)
+            await asyncio.sleep(1)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
@@ -128,8 +128,7 @@ async def start_ping(proxy):
 
 async def ping(proxy):
     """Mengirim ping ke URL tertentu."""
-    global RETRIES, status_connect
-
+    global status_connect
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -139,35 +138,34 @@ async def ping(proxy):
             }
             response = call_api(url, data, proxy)
             if response["code"] == 0:
-                logger.info(f"Ping successful via proxy {proxy} using URL {url}: {response}")
+                logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
                 status_connect = CONNECTION_STATES["CONNECTED"]
                 return
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
 
-    RETRIES += 1
-    if RETRIES >= 2:
-        status_connect = CONNECTION_STATES["DISCONNECTED"]
+    # Jika semua URL gagal
+    logger.warning(f"All ping attempts failed for proxy {proxy}.")
+    status_connect = CONNECTION_STATES["DISCONNECTED"]
 
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     while True:
         proxies = load_proxies('proxies.txt')
-        active_proxies = [proxy for proxy in proxies if is_valid_proxy(proxy)][:MAX_CONNECTIONS]
-
-        if not active_proxies:
-            logger.warning("No valid proxies found. Retrying...")
-            await asyncio.sleep(10)
-            continue
-
+        active_proxies = [proxy for proxy in proxies[:MAX_CONNECTIONS]]
         tasks = {asyncio.create_task(render_profile_info(proxy)): proxy for proxy in active_proxies}
 
-        done, _ = await asyncio.wait(tasks.keys(), return_when=asyncio.FIRST_COMPLETED)
+        done, pending = await asyncio.wait(tasks.keys(), return_when=asyncio.FIRST_COMPLETED)
 
         for task in done:
-            proxy = tasks[task]
-            if task.exception():
-                logger.error(f"Task failed for proxy {proxy}: {task.exception()}")
+            failed_proxy = tasks[task]
+            if task.result() == failed_proxy:
+                logger.info(f"Proxy {failed_proxy} failed. Removing from active proxies.")
+                active_proxies.remove(failed_proxy)
+
+        if not active_proxies:
+            logger.warning("No active proxies available. Retrying in 10 seconds.")
+            await asyncio.sleep(10)
 
 if __name__ == '__main__':
     try:
