@@ -169,8 +169,6 @@ async def main():
             if task.exception():
                 logger.error(f"Task failed for proxy {proxy}: {task.exception()}")
 
-        await asyncio.sleep(5)  # Tunggu sebentar sebelum iterasi berikutnya
-
 if __name__ == '__main__':
     try:
         asyncio.run(main())
