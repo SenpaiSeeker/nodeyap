@@ -164,8 +164,7 @@ async def main():
 
     while True:
         fetch_and_save_proxies(proxy_file)
-        proxies = load_proxies(proxy_file)
-        active_proxies = proxies[:]
+        active_proxies = load_proxies(proxy_file)
 
         if not active_proxies:
             logger.warning("No active proxies available. Retrying in 10 seconds.")
