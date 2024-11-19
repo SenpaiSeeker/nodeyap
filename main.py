@@ -39,7 +39,7 @@ browser_id = {
 def load_token():
     """Memuat token dari file."""
     try:
-        with open('Token.txt', 'r') as file:
+        with open('token.txt', 'r') as file:
             return file.read().strip()
     except Exception as e:
         logger.error(f"Failed to load token: {e}")
