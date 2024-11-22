@@ -123,9 +123,8 @@ async def render_profile_info(proxy, token_info):
 async def start_ping(proxy, token_info):
     """Memulai proses ping berkala."""
     try:
-        while True:
-            await ping(proxy, token_info)
-            await asyncio.sleep(5)  # Tambahkan delay untuk mencegah spam
+        await ping(proxy, token_info)
+        await asyncio.sleep(5)  # Tambahkan delay untuk mencegah spam
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
