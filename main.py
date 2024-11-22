@@ -64,6 +64,7 @@ async def fetch_proxies(api_url):
 def save_proxies(proxy_file, proxies):
     """Menyimpan proxy ke file."""
     try:
+        os.remove(proxy_file)
         with open(proxy_file, 'w') as file:
             file.writelines([proxy + '\n' for proxy in proxies])
         logger.info(f"Saved {len(proxies)} proxies to {proxy_file}.")
@@ -149,11 +150,10 @@ async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
-    
-    #proxies = await fetch_proxies(proxy_api_url)
-    #save_proxies('proxies.txt', proxies)
 
     while True:
+        proxies = await fetch_proxies(proxy_api_url)
+        save_proxies('proxies.txt', proxies)
         active_proxies = load_proxies('proxies.txt')
         tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
         await asyncio.gather(*tasks, return_exceptions=True)
