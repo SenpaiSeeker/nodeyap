@@ -150,12 +150,11 @@ async def main():
     proxy_file = 'proxies.txt'
     token_info = load_token()
     #proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
-
+    #proxies = await fetch_proxies(proxy_api_url)
+    #save_proxies(proxy_file, proxies)
+    active_proxies = load_proxies(proxy_file)
+    
     while True:
-        #proxies = await fetch_proxies(proxy_api_url)
-        #save_proxies(proxy_file, proxies)
-        active_proxies = load_proxies(proxy_file)
-
         tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
         await asyncio.gather(*tasks, return_exceptions=True)
 
