@@ -150,8 +150,8 @@ async def main():
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     
-    proxies = await fetch_proxies(proxy_api_url)
-    save_proxies('proxies.txt', proxies)
+    #proxies = await fetch_proxies(proxy_api_url)
+    #save_proxies('proxies.txt', proxies)
 
     while True:
         active_proxies = load_proxies('proxies.txt')
