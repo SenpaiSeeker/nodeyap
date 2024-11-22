@@ -105,7 +105,7 @@ async def render_profile_info(proxy, token_info):
     """Mengambil informasi profil dan memulai ping."""
     global account_info
     try:
-        logger.info(f"Initializing session for proxy: {proxy}")
+        #logger.info(f"Initializing session for proxy: {proxy}")
         response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
         account_info = response["data"]
 
