@@ -148,10 +148,12 @@ async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
+    isProxy = input("Auto proxy (y/n): ")
 
     while True:
-        proxies = await fetch_proxies(proxy_api_url)
-        save_proxies('proxies.txt', proxies)
+        if isProxy != "n":
+            proxies = await fetch_proxies(proxy_api_url)
+            save_proxies('proxies.txt', proxies)
         active_proxies = load_proxies('proxies.txt')
         tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
         await asyncio.gather(*tasks, return_exceptions=True)
