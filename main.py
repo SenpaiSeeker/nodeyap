@@ -124,7 +124,7 @@ async def start_ping(proxy, token_info):
     try:
         while True:
             await ping(proxy, token_info)
-            await asyncio.sleep(1)  # Tambahkan delay untuk mencegah spam
+            await asyncio.sleep(5)  # Tambahkan delay untuk mencegah spam
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
@@ -144,7 +144,6 @@ async def ping(proxy, token_info):
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
-    logger.warning(f"All ping attempts failed for proxy {proxy}.")
 
 async def main():
     """Fungsi utama untuk menjalankan semua tugas."""
