@@ -120,10 +120,10 @@ async def main():
     
     proxies = await fetch_proxies(proxy_api_url)
     for x in proxies:
-        proxy_list.append(x)
+        proxies_list.append(x)
 
     while True:
-        tasks = [render_profile_info(proxy, token_info) for proxy in proxy_list]
+        tasks = [render_profile_info(proxy, token_info) for proxy in proxies_list]
         await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
