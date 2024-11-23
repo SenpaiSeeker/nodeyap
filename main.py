@@ -129,7 +129,7 @@ async def ping(proxy, token_info):
 
 async def main():
     token_info = load_token()
-    proxy_api_url = "https://files.ramanode.top/airdrop/grass/server_5.txt"
+    proxy_api_url = "https://files.ramanode.top/airdrop/grass/server_1.txt"
    
     while True:
         proxies = await fetch_proxies(proxy_api_url)
