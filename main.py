@@ -78,7 +78,7 @@ async def render_profile_info(proxy, token_info, proxies_list):
         account_info = response["data"]
 
         if account_info.get("uid"):
-            logger.info(f"Session established for proxy: {proxy}. Starting ping.")
+            logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
             await start_ping(proxy, token_info, proxies_list)
         else:
             logger.warning(f"No valid UID found for proxy: {proxy}. Removing from list.")
