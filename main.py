@@ -66,9 +66,8 @@ async def fetch_proxies(api_url):
 def save_proxies(proxy_file, proxies):
     """Menyimpan proxy ke file."""
     try:
-        proxy_list ÷= proxies 
-        with open(proxy_file, 'w') as file:
-            file.writelines([proxy + '\n' for proxy in proxies])
+        for proxy in proxies:
+            proxy_list.append(proxy)
         logger.info(f"Saved {len(proxy_list)} proxies to {proxy_file}.")
     except Exception as e:
         logger.error(f"Error saving proxies: {e}")
