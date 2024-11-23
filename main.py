@@ -93,11 +93,12 @@ async def start_ping(proxy, token_info):
     try:
         while True:
             await ping(proxy, token_info)
-            await asyncio.sleep(5)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
+        proxies_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
+        proxies_list.remove(proxy)
 
 async def ping(proxy, token_info):
     for url in DOMAIN_API["PING"]:
@@ -113,7 +114,6 @@ async def ping(proxy, token_info):
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
             proxies_list.remove(proxy)
-            return
 
 async def main():
     global proxies_list
