@@ -123,7 +123,8 @@ async def render_profile_info(proxy, token_info):
 async def start_ping(proxy, token_info):
     """Memulai proses ping berkala."""
     try:
-        await ping(proxy, token_info)
+        while True:
+            await ping(proxy, token_info)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
@@ -150,13 +151,12 @@ async def main():
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     isProxy = input("Auto proxy (y/n): ")
 
-    while True:
-        if isProxy != "n":
-            proxies = await fetch_proxies(proxy_api_url)
-            save_proxies('proxies.txt', proxies)
-        active_proxies = load_proxies('proxies.txt')
-        tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
-        await asyncio.gather(*tasks, return_exceptions=True)
+    if isProxy != "n":
+        proxies = await fetch_proxies(proxy_api_url)
+        save_proxies('proxies.txt', proxies)
+    active_proxies = load_proxies('proxies.txt')
+    tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
