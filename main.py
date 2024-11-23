@@ -100,6 +100,7 @@ async def call_api(url, data, proxy, token_info):
                 return await valid_resp(response)
     except Exception as e:
         logger.error(f"Error during API call to {url}: {e}")
+        proxy_list.remove(proxy)
         raise ValueError(f"Failed API call to {url}")
 
 async def render_profile_info(proxy, token_info):
