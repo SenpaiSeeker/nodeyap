@@ -11,6 +11,7 @@ DOMAIN_API = {
     ]
 }
 
+proxies_list = []
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -64,41 +65,41 @@ async def call_api(url, data, proxy, token_info):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=data, headers=headers, proxy=proxy) as response:
+            async with session.post(
+                url, json=data, headers=headers, proxy=proxy
+            ) as response:
                 response.raise_for_status()
                 return await valid_resp(response)
     except Exception as e:
-        logger.error(f"Error during API call to {url} via proxy {proxy}: {e}")
+        logger.error(f"Error during API call to {url} with proxy {proxy}: {e}")
         raise ValueError(f"Failed API call to {url}")
 
-async def render_profile_info(proxy, token_info, proxies_list):
+async def render_profile_info(proxy, token_info):
     global account_info
     try:
         response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
         account_info = response["data"]
-
         if account_info.get("uid"):
             logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
-            await start_ping(proxy, token_info, proxies_list)
+            await start_ping(proxy, token_info)
         else:
-            logger.warning(f"No valid UID found for proxy: {proxy}. Removing from list.")
+            logger.warning(f"No valid UID found for proxy: {proxy}. Removing proxy.")
             proxies_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
         proxies_list.remove(proxy)
 
-async def start_ping(proxy, token_info, proxies_list):
+async def start_ping(proxy, token_info):
     try:
         while True:
-            await ping(proxy, token_info, proxies_list)
+            await ping(proxy, token_info)
             await asyncio.sleep(5)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
-        proxies_list.remove(proxy)
 
-async def ping(proxy, token_info, proxies_list):
+async def ping(proxy, token_info):
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -112,17 +113,17 @@ async def ping(proxy, token_info, proxies_list):
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
             proxies_list.remove(proxy)
+            return
 
 async def main():
+    global proxies_list
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     isProxy = input("Auto proxy (y/n): ")
 
-    proxies_list = []
     if isProxy != "n":
         proxies_list = await fetch_proxies(proxy_api_url)
-
-    tasks = [render_profile_info(proxy, token_info, proxies_list) for proxy in proxies_list]
+    tasks = [render_profile_info(proxy, token_info) for proxy in proxies_list]
     await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
