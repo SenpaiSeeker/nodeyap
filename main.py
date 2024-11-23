@@ -3,7 +3,9 @@ import asyncio
 import aiohttp
 import time
 from loguru import logger
+from fake_useragent import UserAgent
 
+user_agent = UserAgent(os='windows', platforms='pc', browsers='chrome')
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
     "PING": [
@@ -59,7 +61,7 @@ async def fetch_proxies(api_url):
 async def call_api(url, data, proxy, token_info):
     headers = {
         "Authorization": f"Bearer {token_info}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "User-Agent": user_agent.random,
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
     }
