@@ -45,9 +45,7 @@ async def fetch_proxies(api_url):
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 if response.status == 200:
-                    proxies = (await response.text()).strip().splitlines()
-                    logger.info(f"Fetched {len(proxies)} proxies from API.")
-                    return proxies
+                    return (await response.text()).strip().splitlines()
                 else:
                     logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
                     return []
@@ -71,7 +69,7 @@ async def call_api(url, data, proxy, token_info):
                 response.raise_for_status()
                 return await valid_resp(response)
     except Exception as e:
-        logger.error(f"Error during API call to {url} with proxy {proxy}: {e}")
+        logger.error(f"Error during API call to {url}: {e}")
         raise ValueError(f"Failed API call to {url}")
 
 async def render_profile_info(proxy, token_info):
@@ -79,25 +77,28 @@ async def render_profile_info(proxy, token_info):
     try:
         response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
         account_info = response["data"]
+
         if account_info.get("uid"):
-            logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
+            logger.info(f"Session established for proxy: {proxy}. Starting ping.")
             await start_ping(proxy, token_info)
         else:
-            logger.warning(f"No valid UID found for proxy: {proxy}. Removing proxy.")
-            proxies_list.remove(proxy)
+            logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
+            return False
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
-        proxies_list.remove(proxy)
+        return False
+    return True
 
 async def start_ping(proxy, token_info):
     try:
-        await ping(proxy, token_info)
+        while True:
+            success = await ping(proxy, token_info)
+            if not success:
+                break
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
-        proxies_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
-        proxies_list.remove(proxy)
 
 async def ping(proxy, token_info):
     for url in DOMAIN_API["PING"]:
@@ -110,21 +111,31 @@ async def ping(proxy, token_info):
             response = await call_api(url, data, proxy, token_info)
             if response["code"] == 0:
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
+                return True
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
-            proxies_list.remove(proxy)
+    return False
 
 async def main():
+    global proxies_list
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     
-    proxies = await fetch_proxies(proxy_api_url)
-    for x in proxies:
-        proxies_list.append(x)
+    proxies_list = await fetch_proxies(proxy_api_url)
+    logger.info(f"Fetched {len(proxies_list)} proxies from API.")
 
-    while True:
-        tasks = [render_profile_info(proxy, token_info) for proxy in proxies_list]
+    tasks = []
+    for proxy in proxies_list[:]:
+        success = await render_profile_info(proxy, token_info)
+        if success:
+            tasks.append(start_ping(proxy, token_info))
+        else:
+            proxies_list.remove(proxy)
+
+    if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
+    else:
+        logger.warning("No valid proxies available.")
 
 if __name__ == '__main__':
     try:
