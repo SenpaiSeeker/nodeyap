@@ -15,6 +15,7 @@ DOMAIN_API = {
 }
 
 # Variabel global
+proxy_list = []
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -65,20 +66,19 @@ async def fetch_proxies(api_url):
 def save_proxies(proxy_file, proxies):
     """Menyimpan proxy ke file."""
     try:
-        #os.system(f"rm -rf {proxy_file}")
+        proxy_list ÷= proxies 
         with open(proxy_file, 'w') as file:
             file.writelines([proxy + '\n' for proxy in proxies])
-        logger.info(f"Saved {len(proxies)} proxies to {proxy_file}.")
+        logger.info(f"Saved {len(proxy_list)} proxies to {proxy_file}.")
     except Exception as e:
         logger.error(f"Error saving proxies: {e}")
 
 def load_proxies(proxy_file):
     """Memuat daftar proxies dari file."""
     try:
-        with open(proxy_file, 'r') as file:
-            proxies = [proxy.strip() for proxy in file if proxy.strip()]
-            logger.info(f"Loaded {len(proxies)} proxies.")
-            return proxies
+        proxies = proxy_list
+        logger.info(f"Loaded {len(proxies)} proxies.")
+        return proxies
     except Exception as e:
         logger.error(f"Failed to load proxies: {e}")
         raise SystemExit("Exiting due to failure in loading proxies")
@@ -128,8 +128,10 @@ async def start_ping(proxy, token_info):
             await asyncio.sleep(5)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
+        proxy_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
+        proxy_list.remove(proxy)
 
 async def ping(proxy, token_info):
     """Mengirim ping ke URL tertentu."""
