@@ -88,10 +88,10 @@ async def render_profile_info(proxy, token_info):
             await start_ping(proxy, token_info)
         else:
             proxies_list.remove(proxy)
-            logger.warning(f"No valid UID found for proxy: {proxy}. Skipping proxies_count {proxies_list}.")
+            logger.warning(f"No valid UID found for proxy: {proxy}. Skipping proxies_count {len(proxies_list)}.")
     except Exception as e:
         proxies_list.remove(proxy)
-        logger.error(f"Error in render_profile_info for proxy {proxy}: {e} proxies_count {proxies_list}.")
+        logger.error(f"Error in render_profile_info for proxy {proxy}: {e} proxies_count {len(proxies_list)}.")
 
 async def start_ping(proxy, token_info):
     try:
@@ -102,7 +102,7 @@ async def start_ping(proxy, token_info):
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
         proxies_list.remove(proxy)
-        logger.error(f"Error in start_ping for proxy {proxy}: {e} proxies_count {proxies_list}.")
+        logger.error(f"Error in start_ping for proxy {proxy}: {e} proxies_count {len(proxies_list)}.")
 
 async def ping(proxy, token_info):
     for url in DOMAIN_API["PING"]:
@@ -114,10 +114,10 @@ async def ping(proxy, token_info):
             }
             response = await call_api(url, data, proxy, token_info)
             if response["code"] == 0:
-                logger.info(f"Ping successful via proxy {proxy} using URL {url} proxies_count {proxies_list}.")
+                logger.info(f"Ping successful via proxy {proxy} using URL {url} proxies_count {len(proxies_list)}.")
         except Exception as e:
             proxies_list.remove(proxy)
-            logger.error(f"Ping failed via proxy {proxy} proxies_count {proxies_list}. using URL {url}: {e}")
+            logger.error(f"Ping failed via proxy {proxy} proxies_count {len(proxies_list)}. using URL {url}: {e}")
 
 async def main():
     token_info = load_token()
