@@ -1,20 +1,26 @@
-import os 
+import os
 import asyncio
 import aiohttp
 import time
 from loguru import logger
-from cloudscraper import create_scraper
+from fake_useragent import UserAgent
 
-# URL API dan Konstanta
+user_agent = UserAgent(os='windows', platforms='pc', browsers='chrome')
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
     "PING": [
-        "http://52.77.10.116/api/network/ping",
         "http://13.215.134.222/api/network/ping",
+        "http://18.139.20.49/api/network/ping",
+        "http://18.142.29.174/api/network/ping",
+        "http://18.142.214.13/api/network/ping",
+        "http://52.74.31.107/api/network/ping",
+        "http://52.74.35.173/api/network/ping",
+        "http://52.77.10.116/api/network/ping",
+        "http://3.1.154.253/api/network/ping"
     ]
 }
 
-# Variabel global
+
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -25,9 +31,7 @@ browser_id = {
     'last_ping_time': None
 }
 
-# Fungsi utilitas
 def load_token():
-    """Memuat token dari file."""
     try:
         with open('token.txt', 'r') as file:
             return file.read().strip()
@@ -36,7 +40,6 @@ def load_token():
         raise SystemExit("Exiting due to failure in loading token")
 
 async def valid_resp(response):
-    """Memvalidasi respons API."""
     try:
         resp_json = await response.json()
         if not resp_json or "code" not in resp_json or resp_json["code"] < 0:
@@ -47,7 +50,6 @@ async def valid_resp(response):
         raise ValueError("Invalid API Response")
 
 async def fetch_proxies(api_url):
-    """Mengambil daftar proxy dari API."""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
@@ -63,9 +65,7 @@ async def fetch_proxies(api_url):
         return []
 
 def save_proxies(proxy_file, proxies):
-    """Menyimpan proxy ke file."""
     try:
-        #os.system(f"rm -rf {proxy_file}")
         with open(proxy_file, 'w') as file:
             file.writelines([proxy + '\n' for proxy in proxies])
         logger.info(f"Saved {len(proxies)} proxies to {proxy_file}.")
@@ -73,7 +73,6 @@ def save_proxies(proxy_file, proxies):
         logger.error(f"Error saving proxies: {e}")
 
 def load_proxies(proxy_file):
-    """Memuat daftar proxies dari file."""
     try:
         with open(proxy_file, 'r') as file:
             proxies = [proxy.strip() for proxy in file if proxy.strip()]
@@ -84,10 +83,9 @@ def load_proxies(proxy_file):
         raise SystemExit("Exiting due to failure in loading proxies")
 
 async def call_api(url, data, proxy, token_info):
-    """Melakukan panggilan API menggunakan aiohttp."""
     headers = {
         "Authorization": f"Bearer {token_info}",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "User-Agent": user_agent.random,
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
     }
@@ -104,10 +102,8 @@ async def call_api(url, data, proxy, token_info):
         raise ValueError(f"Failed API call to {url}")
 
 async def render_profile_info(proxy, token_info):
-    """Mengambil informasi profil dan memulai ping."""
     global account_info
     try:
-        #logger.info(f"Initializing session for proxy: {proxy}")
         response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
         account_info = response["data"]
 
@@ -118,10 +114,9 @@ async def render_profile_info(proxy, token_info):
             logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
-        return proxy  # Mengembalikan proxy yang gagal
+        return proxy
 
 async def start_ping(proxy, token_info):
-    """Memulai proses ping berkala."""
     try:
         while True:
             await ping(proxy, token_info)
@@ -132,7 +127,6 @@ async def start_ping(proxy, token_info):
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
 
 async def ping(proxy, token_info):
-    """Mengirim ping ke URL tertentu."""
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -147,7 +141,6 @@ async def ping(proxy, token_info):
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
 
 async def main():
-    """Fungsi utama untuk menjalankan semua tugas."""
     token_info = load_token()
     proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     isProxy = input("Auto proxy (y/n): ")
@@ -155,9 +148,11 @@ async def main():
     if isProxy != "n":
         proxies = await fetch_proxies(proxy_api_url)
         save_proxies('proxies.txt', proxies)
+
     active_proxies = load_proxies('proxies.txt')
-    tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    while True:
+        tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
