@@ -108,7 +108,7 @@ async def render_profile_info(proxy, token_info):
         account_info = response["data"]
 
         if account_info.get("uid"):
-            logger.info(f"Session established for proxy: {proxy}. Starting ping.")
+            logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
             await start_ping(proxy, token_info)
         else:
             logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
@@ -142,15 +142,14 @@ async def ping(proxy, token_info):
 
 async def main():
     token_info = load_token()
-    proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
     isProxy = input("Auto proxy (y/n): ")
-
-    if isProxy != "n":
-        proxies = await fetch_proxies(proxy_api_url)
-        save_proxies('proxies.txt', proxies)
-
-    active_proxies = load_proxies('proxies.txt')
     while True:
+        if isProxy != "n":
+            proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
+            proxies = await fetch_proxies(proxy_api_url)
+            save_proxies('proxies.txt', proxies)
+
+        active_proxies = load_proxies('proxies.txt')    
         tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
         await asyncio.gather(*tasks, return_exceptions=True)
 
