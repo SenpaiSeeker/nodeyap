@@ -117,7 +117,6 @@ async def render_profile_info(proxy, token_info):
         return proxy
 
 async def start_ping(proxy, token_info):
-    """Memulai proses ping berkala."""
     try:
         while True:
             await ping(proxy, token_info)
@@ -128,7 +127,6 @@ async def start_ping(proxy, token_info):
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
 
 async def ping(proxy, token_info):
-    """Mengirim ping ke URL tertentu."""
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -150,9 +148,11 @@ async def main():
     if isProxy != "n":
         proxies = await fetch_proxies(proxy_api_url)
         save_proxies('proxies.txt', proxies)
+
     active_proxies = load_proxies('proxies.txt')
-    tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
-    await asyncio.gather(*tasks, return_exceptions=True)
+    while True:
+        tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
