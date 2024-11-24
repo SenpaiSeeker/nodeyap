@@ -118,7 +118,8 @@ async def render_profile_info(proxy, token_info):
 
 async def start_ping(proxy, token_info):
     try:
-        await ping(proxy, token_info)
+        while True:
+            await ping(proxy, token_info)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
