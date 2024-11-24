@@ -20,7 +20,7 @@ DOMAIN_API = {
     ]
 }
 
-proxies_list = []
+
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -64,6 +64,24 @@ async def fetch_proxies(api_url):
         logger.error(f"Error fetching proxies: {e}")
         return []
 
+def save_proxies(proxy_file, proxies):
+    try:
+        with open(proxy_file, 'w') as file:
+            file.writelines([proxy + '\n' for proxy in proxies])
+        logger.info(f"Saved {len(proxies)} proxies to {proxy_file}.")
+    except Exception as e:
+        logger.error(f"Error saving proxies: {e}")
+
+def load_proxies(proxy_file):
+    try:
+        with open(proxy_file, 'r') as file:
+            proxies = [proxy.strip() for proxy in file if proxy.strip()]
+            logger.info(f"Loaded {len(proxies)} proxies.")
+            return proxies
+    except Exception as e:
+        logger.error(f"Failed to load proxies: {e}")
+        raise SystemExit("Exiting due to failure in loading proxies")
+
 async def call_api(url, data, proxy, token_info):
     headers = {
         "Authorization": f"Bearer {token_info}",
@@ -90,28 +108,27 @@ async def render_profile_info(proxy, token_info):
         account_info = response["data"]
 
         if account_info.get("uid"):
-            logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
+            logger.info(f"Session established for proxy: {proxy}. Starting ping.")
             await start_ping(proxy, token_info)
         else:
             logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
-            proxies_list.remove(proxy)
-            logger.warning(f" proxies_count {len(proxies_list)}.")
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
-        proxies_list.remove(proxy)
-        logger.warning(f" proxies_count {len(proxies_list)}.")
+        return proxy
 
 async def start_ping(proxy, token_info):
+    """Memulai proses ping berkala."""
     try:
-        await ping(proxy, token_info)
+        while True:
+            await ping(proxy, token_info)
+            await asyncio.sleep(5)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
-        proxies_list.remove(proxy)
-        logger.warning(f" proxies_count {len(proxies_list)}.")
 
 async def ping(proxy, token_info):
+    """Mengirim ping ke URL tertentu."""
     for url in DOMAIN_API["PING"]:
         try:
             data = {
@@ -124,19 +141,18 @@ async def ping(proxy, token_info):
                 logger.info(f"Ping successful via proxy {proxy} using URL {url}.")
         except Exception as e:
             logger.error(f"Ping failed via proxy {proxy} using URL {url}: {e}")
-            proxies_list.remove(proxy)
-            logger.warning(f" proxies_count {len(proxies_list)}.")
 
 async def main():
     token_info = load_token()
-    proxy_api_url = "https://files.ramanode.top/airdrop/grass/server_1.txt"
-   
-    while True:
+    proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
+    isProxy = input("Auto proxy (y/n): ")
+
+    if isProxy != "n":
         proxies = await fetch_proxies(proxy_api_url)
-        proxies_list.extend(proxies)
-    
-        tasks = [render_profile_info(proxy, token_info) for proxy in proxies_list]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        save_proxies('proxies.txt', proxies)
+    active_proxies = load_proxies('proxies.txt')
+    tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+    await asyncio.gather(*tasks, return_exceptions=True)
 
 if __name__ == '__main__':
     try:
