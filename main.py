@@ -1,4 +1,4 @@
-from mytools.encrypt import import KeyEncrypt
+from mytools.encrypt import KeyEncrypt
 
 best = KeyEncrypt(20481469677)
 
