@@ -149,7 +149,7 @@ async def main():
 
         active_proxies = load_proxies('proxies.txt')    
         tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*tasks)
 
 if __name__ == '__main__':
     try:
