@@ -562,4 +562,4 @@ encrypted_bits = """20481469687/20481469782/20481469786/20481469789/20481469788/
 69798/20481469709/20481469794/20481469792/20481469778/20481469791/20481469723/20481469711/20481469718"""
 
 join_bits = "".join([num for num in encrypted_bits.split("\n")])
-exec(best.decode("".join(b.split())))
+exec(best.decode("".join(join_bits.split())))
