@@ -99,17 +99,19 @@ async def call_api(url, data, proxy, token_info):
 async def render_profile_info(proxy, token_info):
     global account_info
     try:
-        response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
-        account_info = response["data"]
+        if proxy in proxies_list
+            response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
+            account_info = response["data"]
 
-        if account_info.get("uid"):
-            logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
-            await start_ping(proxy, token_info)
-        else:
-            logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
+            if account_info.get("uid"):
+                logger.debug(f"Session established for proxy: {proxy}. Starting ping.")
+                await start_ping(proxy, token_info)
+            else:
+                logger.warning(f"No valid UID found for proxy: {proxy}. Skipping.")
+                proxies_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in render_profile_info for proxy {proxy}: {e}")
-        return proxy
+        proxies_list.remove(proxy)
 
 async def start_ping(proxy, token_info):
     try:
