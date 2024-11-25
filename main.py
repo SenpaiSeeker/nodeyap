@@ -99,7 +99,7 @@ async def call_api(url, data, proxy, token_info):
 async def render_profile_info(proxy, token_info):
     global account_info
     try:
-        if proxy in proxies_list
+        if proxy in proxies_list:
             response = await call_api(DOMAIN_API["SESSION"], {}, proxy, token_info)
             account_info = response["data"]
 
