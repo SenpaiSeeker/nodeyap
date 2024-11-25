@@ -15,6 +15,7 @@ DOMAIN_API = {
 }
 
 
+proxies_list = []
 account_info = {}
 browser_id = {
     'ping_count': 0,
@@ -49,7 +50,7 @@ async def fetch_proxies(api_url):
             async with session.get(api_url) as response:
                 if response.status == 200:
                     proxies = (await response.text()).strip().splitlines()
-                    logger.info(f"Fetched {len(proxies)} proxies from API.")
+                    logger.info(f"Fetched {len(proxies_list)} proxies from API.")
                     return proxies
                 else:
                     logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
@@ -112,11 +113,15 @@ async def render_profile_info(proxy, token_info):
 
 async def start_ping(proxy, token_info):
     try:
-        await ping(proxy, token_info)
+        while True:
+            if proxy in proxies_list:
+                await ping(proxy, token_info)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
+        proxies_list.remove(proxy)
     except Exception as e:
         logger.error(f"Error in start_ping for proxy {proxy}: {e}")
+        proxies_list.remove(proxy)
 
 async def ping(proxy, token_info):
     for url in DOMAIN_API["PING"]:
@@ -141,8 +146,9 @@ async def main():
             proxies = await fetch_proxies(proxy_api_url)
             save_proxies('proxies.txt', proxies)
 
-        active_proxies = load_proxies('proxies.txt')    
-        tasks = [render_profile_info(proxy, token_info) for proxy in active_proxies]
+        active_proxies = load_proxies('proxies.txt')
+        proxies_list.extend(active_proxies)
+        tasks = [render_profile_info(proxy, token_info) for proxy in proxies_list]
         await asyncio.gather(*tasks)
 
 if __name__ == '__main__':
