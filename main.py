@@ -7,7 +7,7 @@ import uuid
 from loguru import logger
 import requests
 
-PING_INTERVAL = 130
+PING_INTERVAL = 5
 RETRIES = 60
 MAX_PROXY_PER_TOKEN = 10  # Setiap token hanya bisa menggunakan maksimal 10 proxy
 
