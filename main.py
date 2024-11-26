@@ -72,6 +72,7 @@ def load_proxies(proxy_file):
         with open(proxy_file, 'r') as file:
             proxies = [proxy.strip() for proxy in file if proxy.strip()]
             logger.info(f"Loaded {len(proxies)} proxies.")
+            time.sleep(5)
             return proxies
     except Exception as e:
         logger.error(f"Failed to load proxies: {e}")
@@ -117,9 +118,8 @@ async def render_profile_info(proxy, token_info):
 
 async def start_ping(proxy, token_info):
     try:
-        while True:
-            if proxy in proxies_list:
-                await ping(proxy, token_info)
+        if proxy in proxies_list:
+            await ping(proxy, token_info)
     except asyncio.CancelledError:
         logger.info(f"Ping task for proxy {proxy} was cancelled")
         proxies_list.remove(proxy)
