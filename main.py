@@ -31,7 +31,7 @@ async def fetch_proxies(api_url):
             async with session.get(api_url) as response:
                 if response.status == 200:
                     proxies = (await response.text()).strip().splitlines()
-                    logger.info(f"Fetched {len(proxies_list)} proxies from API.")
+                    logger.info(f"Fetched {len(proxies)} proxies from API.")
                     return proxies
                 else:
                     logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
