@@ -1,14 +1,13 @@
 import asyncio
 import aiohttp
-import cloudscraper
 import json
 import time
+import uuid
 from loguru import logger
-import requests
 
 PING_INTERVAL = 130
 RETRIES = 60
-MAX_PROXY_PER_TOKEN = 999  # Setiap token hanya bisa menggunakan maksimal 10 proxy
+MAX_PROXY_PER_TOKEN = 10  # Setiap token hanya bisa menggunakan maksimal 10 proxy
 
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
@@ -24,8 +23,8 @@ CONNECTION_STATES = {
     "NONE_CONNECTION": 3
 }
 
-# Fungsi untuk mendapatkan daftar proxy dari API
 async def fetch_proxies(api_url):
+    """Fetch proxies asynchronously from a URL."""
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
@@ -40,8 +39,9 @@ async def fetch_proxies(api_url):
         logger.error(f"Error fetching proxies: {e}")
         return []
 
-# Fungsi untuk menyimpan proxy ke file
+
 def save_proxies(proxy_file, proxies):
+    """Save proxies to a file."""
     try:
         with open(proxy_file, 'w') as file:
             file.writelines([proxy + '\n' for proxy in proxies])
@@ -49,12 +49,12 @@ def save_proxies(proxy_file, proxies):
     except Exception as e:
         logger.error(f"Error saving proxies: {e}")
 
-# Class untuk menyimpan informasi akun
+
 class AccountInfo:
     def __init__(self, token, proxy_list):
         self.token = token
-        self.proxy_list = proxy_list  # List of proxies assigned to this account
-        self.active_proxies = proxy_list[:MAX_PROXY_PER_TOKEN]  # Keep only 10 proxies
+        self.proxy_list = proxy_list
+        self.active_proxies = proxy_list[:MAX_PROXY_PER_TOKEN]
         self.status_connect = CONNECTION_STATES["NONE_CONNECTION"]
         self.account_data = {}
         self.retries = 0
@@ -86,98 +86,120 @@ class AccountInfo:
             return True
         return False
 
-scraper = cloudscraper.create_scraper(
-    browser={
-        'browser': 'chrome',
-        'platform': 'windows',
-        'desktop': True
-    }
-)
 
-async def load_tokens():
-    try:
-        with open('token.txt', 'r') as file:
-            tokens = file.read().splitlines()
-        return tokens
-    except Exception as e:
-        logger.error(f"Failed to load tokens: {e}")
-        raise SystemExit("Exiting due to failure in loading tokens")
-
-async def load_proxies(proxy_file):
-    try:
-        with open(proxy_file, 'r') as file:
-            proxies = file.read().splitlines()
-        return proxies
-    except Exception as e:
-        logger.error(f"Failed to load proxies: {e}")
-        raise SystemExit("Exiting due to failure in loading proxies")
-
-# Fungsi untuk memanggil API
-async def call_api(url, data, account_info):
+async def call_api(session, url, data, account_info, proxy):
+    """Make an API call with the given proxy."""
     headers = {
         "Authorization": f"Bearer {account_info.token}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://app.nodepay.ai/",
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
+        "Origin": "https://app.nodepay.ai",
     }
 
+    proxy_url = f"http://{proxy}" if proxy else None
     try:
-        proxy = account_info.active_proxies[0] if account_info.active_proxies else None
-        proxy_config = {
-            "http": proxy,
-            "https": proxy
-        } if proxy else None
-
-        response = scraper.post(url, json=data, headers=headers, proxies=proxy_config, timeout=10)
-        response.raise_for_status()
+        async with session.post(
+            url, json=data, headers=headers, proxy=proxy_url, timeout=10
+        ) as response:
+            response.raise_for_status()
+            return await response.json()
     except Exception as e:
         logger.error(f"Error during API call for token {account_info.token} with proxy {proxy}: {e}")
-        raise ValueError(f"Failed API call to {url}")
+        raise
 
-    return response.json()
 
-# Fungsi utama untuk memproses akun
-async def process_account(account_info):
+async def render_profile_info(session, account_info):
+    """Fetch profile info and start the ping process."""
     try:
-        await render_profile_info(account_info)
-    except Exception as e:
-        logger.error(f"Error processing account {account_info.token}: {e}")
-
-# Fungsi untuk memulai profil
-async def render_profile_info(account_info):
-    try:
-        response = await call_api(DOMAIN_API["SESSION"], {}, account_info)
+        response = await call_api(session, DOMAIN_API["SESSION"], {}, account_info, account_info.active_proxies[0])
         if response.get("code") == 0:
             account_info.account_data = response["data"]
             if account_info.account_data.get("uid"):
-                await start_ping(account_info)
+                await start_ping(session, account_info)
             else:
                 handle_logout(account_info)
         else:
             handle_logout(account_info)
     except Exception as e:
-        logger.error(f"Error in render_profile_info: {e}")
+        logger.error(f"Error in render_profile_info for token {account_info.token}: {e}")
 
-# Fungsi utama
+
+async def start_ping(session, account_info):
+    """Ping continuously with the given account."""
+    try:
+        logger.info(f"Starting ping for token {account_info.token}")
+        await ping(session, account_info)
+        while True:
+            await asyncio.sleep(PING_INTERVAL)
+            await ping(session, account_info)
+    except asyncio.CancelledError:
+        logger.info(f"Ping task cancelled for token {account_info.token}")
+    except Exception as e:
+        logger.error(f"Error in start_ping for token {account_info.token}: {e}")
+
+
+async def ping(session, account_info):
+    """Ping all available endpoints."""
+    for url in DOMAIN_API["PING"]:
+        try:
+            data = {
+                "id": account_info.account_data.get("uid"),
+                "browser_id": account_info.browser_id,
+                "timestamp": int(time.time())
+            }
+            response = await call_api(session, url, data, account_info, account_info.active_proxies[0])
+            if response["code"] == 0:
+                logger.info(f"Token {account_info.token}: Ping successful.")
+                account_info.status_connect = CONNECTION_STATES["CONNECTED"]
+                return
+            else:
+                logger.warning(f"Token {account_info.token}: Ping failed. Response: {response}")
+        except Exception as e:
+            logger.error(f"Token {account_info.token}: Ping error: {e}")
+    account_info.status_connect = CONNECTION_STATES["DISCONNECTED"]
+
+
+def handle_logout(account_info):
+    """Handle logout logic."""
+    account_info.reset()
+    logger.info(f"Logged out for token {account_info.token}")
+
+
 async def main():
     isProxy = input("Auto proxy (y/n): ")
-    if isProxy.lower() != "n":
+    if isProxy != "n":
         proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
         proxies = await fetch_proxies(proxy_api_url)
         save_proxies('proxies.txt', proxies)
 
-    tokens = await load_tokens()
-    all_proxies = await load_proxies('proxies.txt')
+    tokens = []
+    try:
+        with open("token.txt", "r") as f:
+            tokens = f.read().splitlines()
+    except Exception as e:
+        logger.error("Failed to load tokens: {e}")
+        return
 
-    tasks = []
-    for token in tokens:
-        proxies_for_token = all_proxies[:MAX_PROXY_PER_TOKEN]
-        account_info = AccountInfo(token, proxies_for_token)
-        tasks.append(process_account(account_info))
+    proxies = []
+    try:
+        with open("proxies.txt", "r") as f:
+            proxies = f.read().splitlines()
+    except Exception as e:
+        logger.error("Failed to load proxies: {e}")
+        return
 
-    await asyncio.gather(*tasks)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for token in tokens:
+            account_info = AccountInfo(token, proxies[:MAX_PROXY_PER_TOKEN])
+            tasks.append(render_profile_info(session, account_info))
+        await asyncio.gather(*tasks)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
