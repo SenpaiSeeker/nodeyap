@@ -1,15 +1,14 @@
 import asyncio
-import aiohttp 
+import aiohttp
 import cloudscraper
 import json
 import time
-import uuid
 from loguru import logger
 import requests
 
-PING_INTERVAL = 5
+PING_INTERVAL = 130
 RETRIES = 60
-MAX_PROXY_PER_TOKEN = 10  # Setiap token hanya bisa menggunakan maksimal 10 proxy
+MAX_PROXY_PER_TOKEN = 999  # Setiap token hanya bisa menggunakan maksimal 10 proxy
 
 DOMAIN_API = {
     "SESSION": "https://api.nodepay.ai/api/auth/session",
@@ -25,6 +24,7 @@ CONNECTION_STATES = {
     "NONE_CONNECTION": 3
 }
 
+# Fungsi untuk mendapatkan daftar proxy dari API
 async def fetch_proxies(api_url):
     try:
         async with aiohttp.ClientSession() as session:
@@ -38,8 +38,9 @@ async def fetch_proxies(api_url):
                     return []
     except Exception as e:
         logger.error(f"Error fetching proxies: {e}")
-        return []   
-        
+        return []
+
+# Fungsi untuk menyimpan proxy ke file
 def save_proxies(proxy_file, proxies):
     try:
         with open(proxy_file, 'w') as file:
@@ -48,6 +49,7 @@ def save_proxies(proxy_file, proxies):
     except Exception as e:
         logger.error(f"Error saving proxies: {e}")
 
+# Class untuk menyimpan informasi akun
 class AccountInfo:
     def __init__(self, token, proxy_list):
         self.token = token
@@ -92,25 +94,6 @@ scraper = cloudscraper.create_scraper(
     }
 )
 
-def check_proxy(proxy):
-    try:
-        proxy_config = {
-            "http": f"http://{proxy['username']}:{proxy['password']}@{proxy['host']}:{proxy['port']}",
-            "https": f"http://{proxy['username']}:{proxy['password']}@{proxy['host']}:{proxy['port']}"
-        } if proxy.get('username') and proxy.get('password') else {
-            "http": f"http://{proxy['host']}:{proxy['port']}",
-            "https": f"http://{proxy['host']}:{proxy['port']}"
-        }
-        
-        response = requests.get("https://ipinfo.io/json", proxies=proxy_config, timeout=10)
-        response.raise_for_status()
-        ip_info = response.json()
-        logger.info(f"Proxy {proxy['host']}:{proxy['port']} is working. IP: {ip_info['ip']}")
-        return True
-    except requests.RequestException as e:
-        logger.error(f"Proxy {proxy['host']}:{proxy['port']} failed: {e}")
-        return False
-
 async def load_tokens():
     try:
         with open('token.txt', 'r') as file:
@@ -129,32 +112,38 @@ async def load_proxies(proxy_file):
         logger.error(f"Failed to load proxies: {e}")
         raise SystemExit("Exiting due to failure in loading proxies")
 
+# Fungsi untuk memanggil API
 async def call_api(url, data, account_info):
     headers = {
         "Authorization": f"Bearer {account_info.token}",
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://app.nodepay.ai/",
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
-        "Origin": "https://app.nodepay.ai",
-        "Sec-Ch-Ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "cors-site"
     }
 
     try:
-        response = scraper.post(url, json=data, headers=headers, proxies={"http": account_info.active_proxies[0], "https": account_info.active_proxies[0]}, timeout=10)
+        proxy = account_info.active_proxies[0] if account_info.active_proxies else None
+        proxy_config = {
+            "http": proxy,
+            "https": proxy
+        } if proxy else None
+
+        response = scraper.post(url, json=data, headers=headers, proxies=proxy_config, timeout=10)
         response.raise_for_status()
     except Exception as e:
-        logger.error(f"Error during API call for token {account_info.token} with proxy {account_info.active_proxies[0]}: {e}")
+        logger.error(f"Error during API call for token {account_info.token} with proxy {proxy}: {e}")
         raise ValueError(f"Failed API call to {url}")
 
     return response.json()
 
+# Fungsi utama untuk memproses akun
+async def process_account(account_info):
+    try:
+        await render_profile_info(account_info)
+    except Exception as e:
+        logger.error(f"Error processing account {account_info.token}: {e}")
+
+# Fungsi untuk memulai profil
 async def render_profile_info(account_info):
     try:
         response = await call_api(DOMAIN_API["SESSION"], {}, account_info)
@@ -167,88 +156,24 @@ async def render_profile_info(account_info):
         else:
             handle_logout(account_info)
     except Exception as e:
-        logger.error(f"Error in render_profile_info for proxy {account_info.active_proxies[0]} with token {account_info.token}: {e}")
+        logger.error(f"Error in render_profile_info: {e}")
 
-async def start_ping(account_info):
-    try:
-        logger.info(f"Starting ping for proxy {account_info.active_proxies[0]} with token {account_info.token}")
-        await ping(account_info)
-        while True:
-            await asyncio.sleep(PING_INTERVAL)
-            await ping(account_info)
-    except asyncio.CancelledError:
-        logger.info(f"Ping task for proxy {account_info.active_proxies[0]} was cancelled for token {account_info.token}")
-    except Exception as e:
-        logger.error(f"Error in start_ping for proxy {account_info.active_proxies[0]} with token {account_info.token}: {e}")
-
-async def ping(account_info):
-    global RETRIES
-
-    for url in DOMAIN_API["PING"]:
-        try:
-            data = {
-                "id": account_info.account_data.get("uid"),
-                "browser_id": account_info.browser_id,
-                "timestamp": int(time.time())
-            }
-
-            response = await call_api(url, data, account_info)
-            if response["code"] == 0:
-                logger.info(f"Token {account_info.token}: Ping successful via proxy {account_info.active_proxies[0]} using URL {url}")
-                RETRIES = 0
-                account_info.status_connect = CONNECTION_STATES["CONNECTED"]
-                return
-            else:
-                handle_ping_fail(account_info, response)
-        except Exception as e:
-            logger.error(f"Token {account_info.token}: Ping failed via proxy {account_info.active_proxies[0]} using URL {url}: {e}")
-
-    handle_ping_fail(account_info, None)
-
-def handle_ping_fail(account_info, response):
-    global RETRIES
-
-    RETRIES += 1
-    if response and response.get("code") == 403:
-        handle_logout(account_info)
-    elif RETRIES < 2:
-        account_info.status_connect = CONNECTION_STATES["DISCONNECTED"]
-    else:
-        account_info.status_connect = CONNECTION_STATES["DISCONNECTED"]
-
-        # Replace the failed proxy with a new one from the remaining proxies
-        if len(account_info.active_proxies) < MAX_PROXY_PER_TOKEN:
-            new_proxy = account_info.proxy_list[len(account_info.active_proxies)]
-            if check_proxy(new_proxy):
-                account_info.add_new_proxy(new_proxy)
-        else:
-            logger.warning(f"All proxies exhausted for account {account_info.token}.")
-
-def handle_logout(account_info):
-    account_info.reset()
-    logger.info(f"Logged out and cleared session info for proxy {account_info.active_proxies[0]}")
-
+# Fungsi utama
 async def main():
     isProxy = input("Auto proxy (y/n): ")
-    if isProxy != "n":
+    if isProxy.lower() != "n":
         proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
         proxies = await fetch_proxies(proxy_api_url)
         save_proxies('proxies.txt', proxies)
-        
+
     tokens = await load_tokens()
     all_proxies = await load_proxies('proxies.txt')
 
-    token_proxy_mapping = {}
-    for i, token in enumerate(tokens):
-        proxies_for_token = all_proxies * (MAX_PROXY_PER_TOKEN // len(all_proxies)) + all_proxies[:MAX_PROXY_PER_TOKEN % len(all_proxies)]
-        token_proxy_mapping[token] = proxies_for_token[:MAX_PROXY_PER_TOKEN]
-
     tasks = []
-    for token_id, (token, proxies) in enumerate(token_proxy_mapping.items(), start=1):
-        account_info = AccountInfo(token, proxies)
-        
-        task = asyncio.create_task(render_profile_info(account_info))
-        tasks.append(task)
+    for token in tokens:
+        proxies_for_token = all_proxies[:MAX_PROXY_PER_TOKEN]
+        account_info = AccountInfo(token, proxies_for_token)
+        tasks.append(process_account(account_info))
 
     await asyncio.gather(*tasks)
 
