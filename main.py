@@ -1,5 +1,6 @@
 import os
 import asyncio
+import cloudscraper
 import aiohttp
 import json
 import time
@@ -26,6 +27,14 @@ browser_id = {
     'last_ping_status': 'Waiting...',
     'last_ping_time': None
 }
+
+scraper = cloudscraper.create_scraper(
+    browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'desktop': True
+    }
+)
 
 def load_token():
     try:
@@ -89,19 +98,25 @@ def load_proxies(proxy_file):
 async def call_api(url, data, proxy, token_info):
     headers = {
         "Authorization": f"Bearer {token_info}",
-        "User-Agent": user_agent.random,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://app.nodepay.ai/",
         "Accept": "application/json, text/plain, */*",
         "Content-Type": "application/json",
+        "Origin": "https://app.nodepay.ai",
+        "Sec-Ch-Ua": '"Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cors-site"
     }
 
     try:
         if proxy in proxies_list:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url, json=data, headers=headers, proxy=proxy
-                ) as response:
-                    response.raise_for_status()
-                    return await valid_resp(response)
+            response = scraper.post(url, json=data, headers=headers, proxies={"http": proxy, "https": proxy}, timeout=10)
+            response.raise_for_status()
+            return await valid_resp(response)
     except Exception as e:
         logger.error(f"Error during API call to {url}: {e}")
         raise ValueError(f"Failed API call to {url}")
