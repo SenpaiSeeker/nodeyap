@@ -1,6 +1,7 @@
 import os
 import asyncio
 import aiohttp
+import json
 import time
 from loguru import logger
 from fake_useragent import UserAgent
@@ -50,18 +51,21 @@ async def fetch_proxies(api_url):
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 if response.status == 200:
-                    proxies = (await response.text()).strip()
-                    for x in proxies:
-                        proxy = f"{x['data'][0]['protocols'][0]}://{x['data'][0]['ip']}:{x['data'][0]['port']}"
+                    response_text = await response.text()
+                    data = json.loads(response_text)  # Parsing JSON
+                    for item in data.get('data', []):  # Loop melalui setiap item di 'data'
+                        protocol = item['protocols'][0] if item['protocols'] else "unknown"
+                        proxy = f"{protocol}://{item['ip']}:{item['port']}"
                         list_proxies.append(proxy)
-                    logger.info(f"Fetched {len(proxies_list)} proxies from API.")
-                    return proxies
+                    logger.info(f"Fetched {len(list_proxies)} proxies from API.")
+                    return list_proxies
                 else:
                     logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
                     return []
     except Exception as e:
         logger.error(f"Error fetching proxies: {e}")
         return []
+
 
 def save_proxies(proxy_file, proxies):
     try:
