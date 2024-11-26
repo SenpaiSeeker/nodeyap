@@ -154,7 +154,7 @@ async def main():
     isProxy = input("Auto proxy (y/n): ")
     while True:
         if isProxy != "n":
-            proxy_api_url = "https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc"
+            proxy_api_url = "https://proxylist.geonode.com/api/proxy-list?protocols=http&limit=500&page=1&sort_by=lastChecked&sort_type=desc"
             proxies = await fetch_proxies(proxy_api_url)
             save_proxies('proxies.txt', proxies)
 
