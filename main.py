@@ -118,7 +118,7 @@ def check_proxy(proxy):
 
 async def load_tokens():
     try:
-        with open('Token.txt', 'r') as file:
+        with open('token.txt', 'r') as file:
             tokens = file.read().splitlines()
         return tokens
     except Exception as e:
