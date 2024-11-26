@@ -26,25 +26,19 @@ CONNECTION_STATES = {
 }
 
 async def fetch_proxies(api_url):
-    list_proxies = []
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 if response.status == 200:
-                    response_text = await response.text()
-                    data = json.loads(response_text)  # Parsing JSON
-                    for item in data.get('data', []):  # Loop melalui setiap item di 'data'
-                        protocol = item['protocols'][0] if item['protocols'] else "unknown"
-                        proxy = f"{protocol}://{item['ip']}:{item['port']}"
-                        list_proxies.append(proxy)
-                    logger.info(f"Fetched {len(list_proxies)} proxies from API.")
-                    return list_proxies
+                    proxies = (await response.text()).strip().splitlines()
+                    logger.info(f"Fetched {len(proxies_list)} proxies from API.")
+                    return proxies
                 else:
                     logger.warning(f"Failed to fetch proxies. Status code: {response.status}")
                     return []
     except Exception as e:
         logger.error(f"Error fetching proxies: {e}")
-        return []
+        return []   
         
 def save_proxies(proxy_file, proxies):
     try:
@@ -237,7 +231,7 @@ def handle_logout(account_info):
 async def main():
     isProxy = input("Auto proxy (y/n): ")
     if isProxy != "n":
-        proxy_api_url = "https://proxylist.geonode.com/api/proxy-list?protocols=http&limit=500&page=1&sort_by=lastChecked&sort_type=desc"
+        proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
         proxies = await fetch_proxies(proxy_api_url)
         save_proxies('proxies.txt', proxies)
         
