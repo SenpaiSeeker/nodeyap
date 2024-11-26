@@ -45,11 +45,15 @@ async def valid_resp(response):
         raise ValueError("Invalid API Response")
 
 async def fetch_proxies(api_url):
+    list_proxies = []
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 if response.status == 200:
-                    proxies = (await response.text()).strip().splitlines()
+                    proxies = await response.text()).strip()
+                    for x in proxies:
+                        proxy = f"{x['data'][0]['protocols'][0]}://{x['data'][0]['ip']}:{x['data'][0]['port']}"
+                        list_proxies.append(proxy)
                     logger.info(f"Fetched {len(proxies_list)} proxies from API.")
                     return proxies
                 else:
@@ -146,7 +150,7 @@ async def main():
     isProxy = input("Auto proxy (y/n): ")
     while True:
         if isProxy != "n":
-            proxy_api_url = "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=text"
+            proxy_api_url = "https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc"
             proxies = await fetch_proxies(proxy_api_url)
             save_proxies('proxies.txt', proxies)
 
