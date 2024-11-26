@@ -50,7 +50,7 @@ async def fetch_proxies(api_url):
         async with aiohttp.ClientSession() as session:
             async with session.get(api_url) as response:
                 if response.status == 200:
-                    proxies = await response.text()).strip()
+                    proxies = (await response.text()).strip()
                     for x in proxies:
                         proxy = f"{x['data'][0]['protocols'][0]}://{x['data'][0]['ip']}:{x['data'][0]['port']}"
                         list_proxies.append(proxy)
